@@ -4,28 +4,44 @@ volumes:
   pg_data_production:
   static_volume:
 
-# Всё отличие — заменяем build на image и указываем, какой образ использовать
 services:
   db:
     image: postgres:13.10
+    restart: unless-stopped
     env_file: .env
     volumes:
       - pg_data_production:/var/lib/postgresql/data
+
   backend:
-    image: pmmage/taski_backend # Качаем с Docker Hub
+    image: pmmage/taski_backend
+    restart: unless-stopped
     env_file: .env
+    depends_on:
+      - db
     volumes:
       - static_volume:/backend_static
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   frontend:
-    image: pmmage/taski_frontend  # Качаем с Docker Hub
+    image: pmmage/taski_frontend
+    restart: no
     env_file: .env
     command: cp -r /app/build/. /frontend_static/
     volumes:
       - static_volume:/frontend_static
+
   gateway:
-    image: pmmage/taski_gateway  # Качаем с Docker Hub
+    image: pmmage/taski_gateway
+    restart: unless-stopped
     env_file: .env
-    volumes:
-      - static_volume:/staticfiles/
     ports:
       - 8000:80
+    volumes:
+      - static_volume:/staticfiles/
+    depends_on:
+      - backend
+      - frontend
